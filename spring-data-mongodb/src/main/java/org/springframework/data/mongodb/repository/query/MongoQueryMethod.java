@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013 the original author or authors.
+ * Copyright 2011-2014 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,10 @@ package org.springframework.data.mongodb.repository.query;
 import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.data.geo.GeoPage;
@@ -28,6 +31,7 @@ import org.springframework.data.mapping.context.MappingContext;
 import org.springframework.data.mongodb.core.mapping.MongoPersistentEntity;
 import org.springframework.data.mongodb.core.mapping.MongoPersistentProperty;
 import org.springframework.data.mongodb.repository.Query;
+import org.springframework.data.mongodb.repository.Query.CustomQuoting;
 import org.springframework.data.repository.core.RepositoryMetadata;
 import org.springframework.data.repository.query.QueryMethod;
 import org.springframework.data.util.ClassTypeInformation;
@@ -39,11 +43,17 @@ import org.springframework.util.StringUtils;
  * Mongo specific implementation of {@link QueryMethod}.
  * 
  * @author Oliver Gierke
+ * @author Thomas Darimont
  */
 public class MongoQueryMethod extends QueryMethod {
 
+	private static final String CUSTOM_QUOTING = "customQuoting";
+
 	@SuppressWarnings("unchecked") private static final List<Class<? extends Serializable>> GEO_NEAR_RESULTS = Arrays
 			.asList(GeoResult.class, GeoResults.class, GeoPage.class);
+
+	private final boolean queryIsAlreadyQuoted;
+	private final boolean fieldsAreAlreadyQuoted;
 
 	private final Method method;
 	private final MappingContext<? extends MongoPersistentEntity<?>, MongoPersistentProperty> mappingContext;
@@ -64,6 +74,10 @@ public class MongoQueryMethod extends QueryMethod {
 
 		this.method = method;
 		this.mappingContext = mappingContext;
+
+		Set<CustomQuoting> customQuoting = getCustomQuoting();
+		this.queryIsAlreadyQuoted = customQuoting.contains(CustomQuoting.QUERY);
+		this.fieldsAreAlreadyQuoted = customQuoting.contains(CustomQuoting.FIELDS);
 	}
 
 	/*
@@ -94,6 +108,18 @@ public class MongoQueryMethod extends QueryMethod {
 
 		String query = (String) AnnotationUtils.getValue(getQueryAnnotation());
 		return StringUtils.hasText(query) ? query : null;
+	}
+
+	/**
+	 * Returns the {@link CustomQuoting} that should be considered when rendering the query object.
+	 * 
+	 * @return
+	 */
+	Set<CustomQuoting> getCustomQuoting() {
+
+		CustomQuoting[] customQuoting = (CustomQuoting[]) AnnotationUtils.getValue(getQueryAnnotation(), CUSTOM_QUOTING);
+		return customQuoting != null ? new HashSet<Query.CustomQuoting>(Arrays.asList(customQuoting)) : Collections
+				.<CustomQuoting> emptySet();
 	}
 
 	/**
@@ -143,7 +169,7 @@ public class MongoQueryMethod extends QueryMethod {
 	}
 
 	/**
-	 * Returns whether te query is a geo near query.
+	 * Returns whether the query is a geo near query.
 	 * 
 	 * @return
 	 */
@@ -180,5 +206,25 @@ public class MongoQueryMethod extends QueryMethod {
 
 	TypeInformation<?> getReturnType() {
 		return ClassTypeInformation.fromReturnTypeOf(method);
+	}
+
+	/**
+	 * Returns {@literal true} if the query is marked as already quoted.
+	 * 
+	 * @return
+	 * @since 1.5
+	 */
+	boolean isQueryIsAlreadyQuoted() {
+		return this.queryIsAlreadyQuoted;
+	}
+
+	/**
+	 * Returns {@literal true} if the fields are marked as already quoted.
+	 * 
+	 * @return
+	 * @since 1.5
+	 */
+	boolean isFieldsAreAlreadyQuoted() {
+		return this.fieldsAreAlreadyQuoted;
 	}
 }

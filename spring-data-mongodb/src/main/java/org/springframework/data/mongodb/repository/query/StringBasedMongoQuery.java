@@ -31,6 +31,7 @@ import com.mongodb.util.JSON;
  * 
  * @author Oliver Gierke
  * @author Christoph Strobl
+ * @author Thomas Darimont
  */
 public class StringBasedMongoQuery extends AbstractMongoQuery {
 
@@ -81,12 +82,12 @@ public class StringBasedMongoQuery extends AbstractMongoQuery {
 	@Override
 	protected Query createQuery(ConvertingParameterAccessor accessor) {
 
-		String queryString = replacePlaceholders(query, accessor);
+		String queryString = replacePlaceholders(query, accessor, getQueryMethod().isQueryIsAlreadyQuoted());
 
 		Query query = null;
 
 		if (fieldSpec != null) {
-			String fieldString = replacePlaceholders(fieldSpec, accessor);
+			String fieldString = replacePlaceholders(fieldSpec, accessor, getQueryMethod().isFieldsAreAlreadyQuoted());
 			query = new BasicQuery(queryString, fieldString);
 		} else {
 			query = new BasicQuery(queryString);
@@ -119,7 +120,7 @@ public class StringBasedMongoQuery extends AbstractMongoQuery {
 		return this.isDeleteQuery;
 	}
 
-	private String replacePlaceholders(String input, ConvertingParameterAccessor accessor) {
+	private String replacePlaceholders(String input, ConvertingParameterAccessor accessor, boolean valuesAreAlreadyQuoted) {
 
 		Matcher matcher = PLACEHOLDER.matcher(input);
 		String result = input;
@@ -127,13 +128,20 @@ public class StringBasedMongoQuery extends AbstractMongoQuery {
 		while (matcher.find()) {
 			String group = matcher.group();
 			int index = Integer.parseInt(matcher.group(1));
-			result = result.replace(group, getParameterWithIndex(accessor, index));
+			result = result.replace(group, getParameterWithIndex(accessor, index, valuesAreAlreadyQuoted));
 		}
 
 		return result;
 	}
 
-	private String getParameterWithIndex(ConvertingParameterAccessor accessor, int index) {
+	private String getParameterWithIndex(ConvertingParameterAccessor accessor, int index, boolean valueIsQuoted) {
+
+		Object result = accessor.getBindableValue(index);
+
+		if (result instanceof String && valueIsQuoted) {
+			return (String) result;
+		}
+
 		return JSON.serialize(accessor.getBindableValue(index));
 	}
 }

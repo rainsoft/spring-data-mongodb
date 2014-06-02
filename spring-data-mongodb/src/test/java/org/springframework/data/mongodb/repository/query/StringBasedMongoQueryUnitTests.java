@@ -18,6 +18,7 @@ package org.springframework.data.mongodb.repository.query;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.data.mongodb.repository.Query.CustomQuoting.*;
 
 import java.lang.reflect.Method;
 
@@ -46,6 +47,7 @@ import com.mongodb.DBObject;
  * 
  * @author Oliver Gierke
  * @author Christoph Strobl
+ * @author Thomas Darimont
  */
 @RunWith(MockitoJUnitRunner.class)
 public class StringBasedMongoQueryUnitTests {
@@ -158,6 +160,24 @@ public class StringBasedMongoQueryUnitTests {
 		createQueryForMethod("invalidMethod", String.class);
 	}
 
+	/**
+	 * @see DATAMONGO-420
+	 */
+	@Test
+	public void shouldSupportDetectingAlreadyQuotedValuesInQueryAndFieldDefinitions() throws Exception {
+
+		StringBasedMongoQuery mongoQuery = createQueryForMethod("findByDynamicQueryWithFieldsAndCustomQuoting",
+				String.class, String.class);
+		ConvertingParameterAccessor accessor = StubParameterAccessor.getAccessor(converter, new Object[] {
+				"'firstname':'bubu', 'lastname': 'baba'", "'lastname':1" });
+
+		org.springframework.data.mongodb.core.query.Query query = mongoQuery.createQuery(accessor);
+
+		assertThat(query.getQueryObject(),
+				is(new BasicQuery("{ \"firstname\": \"bubu\", \"lastname\": \"baba\"}").getQueryObject()));
+		assertThat(query.getFieldsObject(), is(new BasicQuery(null, "{ \"lastname\": 1}").getFieldsObject()));
+	}
+
 	private StringBasedMongoQuery createQueryForMethod(String name, Class<?>... parameters) throws Exception {
 
 		Method method = SampleRepository.class.getMethod(name, parameters);
@@ -184,5 +204,8 @@ public class StringBasedMongoQueryUnitTests {
 
 		@Query(value = "{ 'lastname' : ?0 }", delete = true, count = true)
 		void invalidMethod(String lastname);
+
+		@Query(value = "{?0}", fields = "{?1}", customQuoting = { QUERY, FIELDS })
+		DBObject findByDynamicQueryWithFieldsAndCustomQuoting(String criteria, String fields);
 	}
 }

@@ -68,4 +68,29 @@ public @interface Query {
 	 * @return
 	 */
 	boolean delete() default false;
+
+	/**
+	 * Returns an array of {@link CustomQuoting}s that controls the quote handling for the respective query parts.
+	 * Defaults to <code>{}</code> which means no custom quoting.
+	 * 
+	 * @since 1.5
+	 * @return
+	 */
+	CustomQuoting[] customQuoting() default {};
+
+	/**
+	 * @author Thomas Darimont
+	 * @since 1.5
+	 */
+	public enum CustomQuoting {
+		/**
+		 * The {@link Query#value()} should be treated as already quoted.
+		 */
+		QUERY,
+
+		/**
+		 * The {@link Query#fields()} should be treated as already quoted.
+		 */
+		FIELDS
+	}
 }
